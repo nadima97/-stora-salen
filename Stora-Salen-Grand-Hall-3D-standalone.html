@@ -107,7 +107,7 @@ input[type=range]{width:100%;accent-color:var(--brass);margin:2px 0 4px}
       <input type="range" id="bay" min="2" max="5" step="1" value="3" aria-describedby="bayText" aria-label="Window bay for mimbar and divider">
       <p class="note" id="bayText" style="margin-top:2px"></p>
       <label class="tog"><input type="checkbox" id="divTog" checked> Divider</label>
-      <label class="tog"><input type="checkbox" id="blindTog" checked> Window curtains drawn</label>
+      <label class="tog"><input type="checkbox" id="blindTog"> Window curtains drawn</label>
       <label class="tog"><input type="checkbox" id="lblTog" checked> Labels</label>
     </section>
     <p class="note foot">Dimensions are read from the floor plan (about 42.5 by 10.7 m) and are accurate to roughly a metre.</p>
@@ -1184,7 +1184,7 @@ const R20X = 19.3, R20Z = 5.3, R20E = L - R20X, CW = 2.2, CX = L - CW; // men's 
 const NB = 9, BAY = L / NB, GL = 3.6, MPW = GL + 0.4; // 9 window bays, glazing width, mihrab panel width
 const SILL = 0.85, WTOP = 2.45, REC = 0.12; // window sill, head, recess
 
-const state = { bay:3, divider:true, open20:false, blinds:true, labels:true, mode:'prayer', view:'entrance' };
+const state = { bay:3, divider:true, open20:false, blinds:false, labels:true, mode:'prayer', view:'entrance' };
 const bayC = i => (i + 0.5) * BAY;
 const divX = () => bayC(state.bay);
 const depthAt = x => (x <= R20E || (state.open20 && x <= CX)) ? D : R20Z;
@@ -1692,7 +1692,7 @@ function archPanelTexture(){
 }
 
 /* Carved wooden calligraphy pieces (transparent background) */
-function woodFill(g, W, Hh){ g.globalCompositeOperation = 'source-in'; drawOak(g, 0, 0, W, Hh, 41); g.fillStyle = 'rgba(110,60,25,0.35)'; g.fillRect(0, 0, W, Hh); g.globalCompositeOperation = 'source-over'; }
+function woodFill(g, W, Hh){ const [c2, g2] = mkCanvas(W, Hh); drawOak(g2, 0, 0, W, Hh, 41); g2.fillStyle = 'rgba(110,60,25,0.35)'; g2.fillRect(0, 0, W, Hh); g.globalCompositeOperation = 'source-in'; g.drawImage(c2, 0, 0); g.globalCompositeOperation = 'source-over'; }
 function woodWordTexture(text){
   const S = 600, [c, g] = mkCanvas(S, S);
   g.fillStyle = '#000'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -1756,7 +1756,7 @@ const mat = {
   persian: new THREE.MeshStandardMaterial({ map:persianPanelTexture(), side:THREE.DoubleSide, roughness:0.4, metalness:0.05 }),
   mihrab: new THREE.MeshStandardMaterial({ map:mihrabTexture(), roughness:0.7 }),
 };
-const woodMat = tex => new THREE.MeshStandardMaterial({ map:tex, alphaTest:0.5, roughness:0.6 });
+const woodMat = tex => new THREE.MeshStandardMaterial({ map:tex, alphaTest:0.4, roughness:0.6 });
 const woodArt = { allah:woodWordTexture('الله'), muhammad:woodWordTexture('محمد'), ali:woodWordTexture('علي'), kursi:woodKursiTexture() };
 const imamMats = IMAMS.map(n => new THREE.MeshStandardMaterial({ map:imamTexture(n), roughness:0.8 }));
 const latDepth = new THREE.MeshDepthMaterial({ depthPacking:THREE.RGBADepthPacking, map:latTex, alphaTest:0.5 });
@@ -2036,6 +2036,36 @@ function addWood(tex, w, x, y, z, nx, nz){
   pl.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking:THREE.RGBADepthPacking, map:tex, alphaTest:0.5 });
   pl.position.set(x + nx * 0.03, y, z + nz * 0.03); pl.rotation.y = Math.atan2(nx, nz); artG.add(pl);
 }
+function addConsole(x, z, nx, nz){
+  const gr = new THREE.Group(), W = 2.4, Dp = 0.6, Hc = 0.88;
+  const b = (w, h, d, m, px, py, pz) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(px, py, pz); me.castShadow = me.receiveShadow = true; gr.add(me); return me; };
+  const cyl = (r, h, m, px, py, pz) => { const me = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), m); me.position.set(px, py, pz); me.castShadow = true; gr.add(me); return me; };
+  const steel = colMat('#B8BCC0'), dark = colMat('#2A2A2A'), white = colMat('#F2EEE6'), top = colMat('#D9CFC0');
+  // Cabinets: plinth, carcass, four doors with handles, worktop
+  b(W - 0.04, 0.1, Dp - 0.08, colMat('#2E2019'), 0, 0.05, (Dp - 0.08) / 2);
+  b(W, Hc - 0.1, Dp - 0.02, mat.walnut, 0, 0.1 + (Hc - 0.1) / 2, (Dp - 0.02) / 2);
+  for (let k = 0; k < 4; k++){
+    const dw = W / 4 - 0.008, dx = -W / 2 + W / 8 + k * W / 4;
+    b(dw, Hc - 0.14, 0.02, mat.walnut, dx, 0.12 + (Hc - 0.14) / 2, Dp - 0.01);
+    b(0.015, 0.14, 0.025, mat.bronze, dx + (k % 2 ? -1 : 1) * (dw / 2 - 0.05), Hc - 0.18, Dp + 0.012);
+  }
+  b(W + 0.04, 0.035, Dp + 0.02, top, 0, Hc + 0.0175, Dp / 2);
+  const y0 = Hc + 0.035;
+  // Coffee machine
+  b(0.3, 0.38, 0.38, dark, -0.95, y0 + 0.19, 0.3); b(0.24, 0.08, 0.02, steel, -0.95, y0 + 0.28, 0.5);
+  // Tea urn and kettle
+  cyl(0.15, 0.42, steel, -0.5, y0 + 0.21, 0.28); cyl(0.04, 0.05, dark, -0.5, y0 + 0.45, 0.28);
+  cyl(0.08, 0.22, white, -0.18, y0 + 0.11, 0.3);
+  // Stacks of cups
+  [0.1, 0.24].forEach((cx, i) => { for (let j = 0; j < 4; j++) cyl(0.042, 0.09, white, cx, y0 + 0.045 + j * 0.035, 0.36 - i * 0.02); });
+  // Bottled water
+  for (let j = 0; j < 5; j++) cyl(0.035, 0.26, colMat('#7FA6C8'), 0.42 + (j % 3) * 0.08, y0 + 0.13, 0.22 + Math.floor(j / 3) * 0.1);
+  // Snack basket, tissues and wipes
+  b(0.34, 0.12, 0.24, colMat('#B48A5A'), 0.82, y0 + 0.06, 0.32);
+  b(0.22, 0.11, 0.12, white, 1.05, y0 + 0.055, 0.15); b(0.07, 0.03, 0.05, colMat('#E9E5DC'), 1.05, y0 + 0.125, 0.15);
+  b(0.2, 0.06, 0.13, colMat('#5E8FB0'), 1.06, y0 + 0.03, 0.42);
+  gr.position.set(x, 0, z); gr.rotation.y = Math.atan2(nx, nz); artG.add(gr);
+}
 function addTeaTable(x, z, nx, nz){
   const gr = new THREE.Group();
   const b = (w, h, d, m, px, py, pz) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(px, py, pz); me.castShadow = me.receiveShadow = true; gr.add(me); };
@@ -2121,8 +2151,8 @@ function buildArt(){
   addTeaTable(0.95, D - 0.3, 0, -1);
   // Men's end wall
   // Shelving beside the men's door (door spans z 4.0-4.9); its art moved to the men's back wall
-  addShelf(L, 0.6 + 1.215, -1, 0, ++shelfSeed); // 0.6 m clear of the window wall
-  addTeaTable(L - 0.3, 3.75, -1, 0);
+  // Men's refreshment console (Maryam's suggestion): countertop with storage below, in place of the bookshelf
+  addConsole(L, 0.6 + 1.2, -1, 0);
   addShoeRack(CX, 8.0, 1, 0);
   if (state.open20) placeRow(['callE'], R20Z + 0.3, D - 0.3, CX, -1, 0);
   // Side wall of room 20
